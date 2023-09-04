@@ -1,21 +1,57 @@
 import { Camera, CameraType } from 'expo-camera';
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Button, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
+import { View, Text, Image, Button, StyleSheet, TouchableOpacity, Linking, Alert, StatusBar, Dimensions } from 'react-native';
 import * as tf from '@tensorflow/tfjs';
 import { fetch, decodeJpeg, cameraWithTensors } from '@tensorflow/tfjs-react-native';
 import * as mobilenet from '@tensorflow-models/mobilenet';
-import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { NativeStackScreenProps, createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Toast } from 'react-native-toast-message/lib/src/Toast';
+import { MaterialIcons } from '@expo/vector-icons';
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 type RootStackParamList = {
   CameraScreen: undefined;
+  Screen2: undefined;
 }
 
-const CameraScreen = () => {
+type CameraScreenProps = NativeStackScreenProps<RootStackParamList, 'CameraScreen'>;
+type Screen2Props = NativeStackScreenProps<RootStackParamList, 'Screen2'>;
+
+const Screen2 = ({ route, navigation }: Screen2Props) => {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: 'black',
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}>
+      <StatusBar barStyle="light-content" animated />
+      <Button title="Camera" onPress={() => navigation.navigate('CameraScreen')} />
+    </View>
+  )
+}
+
+const CameraScreen = ({ route, navigation }: CameraScreenProps) => {
+  const insets = useSafeAreaInsets();
   const [type, setType] = useState(CameraType.back);
   const [permission, requestPermission] = Camera.useCameraPermissions();
+  const [imagePadding, setImagePadding] = useState(0);
+  const { height, width } = Dimensions.get('window');
+
+  function calculateHeight() {
+    return width * 16 / 9;
+  }
 
   async function openSettings() {
     try {
@@ -43,20 +79,39 @@ const CameraScreen = () => {
       <View
         style={styles.container}>
         <Button title="Request permission" onPress={() => openSettings()} />
-        <StatusBar style="auto" />
       </View>
     )
   }
 
   return (
-    <View style={styles.container}>
-      <Camera style={styles.camera} type={type} ratio='16:9'>
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.button} onPress={toggleCameraType}>
-            <Text style={styles.text}>Flip Camera</Text>
-          </TouchableOpacity>
-        </View>
-      </Camera>
+    <View style={[
+      styles.container,
+      {
+        backgroundColor: 'black',
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom,
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
+      },
+    ]}>
+      <StatusBar barStyle="light-content" animated />
+      <Camera style={[
+        styles.camera,
+        {
+          maxHeight: calculateHeight(),
+        }
+      ]} type={type} ratio='16:9' />
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity onPress={() => navigation.navigate('Screen2')}>
+          <MaterialIcons name="insert-photo" size={32} color="white" />
+        </TouchableOpacity>
+        <TouchableOpacity>
+          <MaterialIcons name="camera" size={48} color="white" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={toggleCameraType}>
+          <MaterialIcons name="flip-camera-ios" size={32} color="white" />
+        </TouchableOpacity>
+      </View>
     </View>
   )
 }
@@ -121,15 +176,15 @@ const App = () => {
   // );
 
   return (
-    <>
+    <SafeAreaProvider>
       <NavigationContainer>
-        <RootStack.Navigator initialRouteName='CameraScreen'>
+        <RootStack.Navigator initialRouteName='Screen2' screenOptions={{ headerShown: false, headerBackVisible: false }}>
           <RootStack.Screen name='CameraScreen' component={CameraScreen} />
+          <RootStack.Screen name='Screen2' component={Screen2} />
         </RootStack.Navigator>
       </NavigationContainer>
-      <StatusBar style="auto" />
       <Toast />
-    </>
+    </SafeAreaProvider>
   )
 
 };
@@ -137,16 +192,17 @@ const App = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignContent: 'center'
+    alignContent: 'center',
   },
   camera: {
     flex: 1,
   },
   buttonContainer: {
-    flex: 1,
-    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'space-around',
     flexDirection: 'row',
-    margin: 20,
+    width: '100%',
+    paddingVertical: 10,
   },
   button: {
     flex: 0.1,
