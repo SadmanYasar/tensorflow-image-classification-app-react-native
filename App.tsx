@@ -4,7 +4,7 @@ import { View, Text, Image, Button, StyleSheet, TouchableOpacity, Linking, Alert
 import * as tf from '@tensorflow/tfjs';
 import { fetch, decodeJpeg, cameraWithTensors } from '@tensorflow/tfjs-react-native';
 import * as mobilenet from '@tensorflow-models/mobilenet';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useIsFocused } from '@react-navigation/native';
 import { NativeStackScreenProps, createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Toast } from 'react-native-toast-message/lib/src/Toast';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -15,14 +15,15 @@ import {
 
 type RootStackParamList = {
   CameraScreen: undefined;
-  Screen2: undefined;
+  ResutltScreen: { url?: string };
 }
 
 type CameraScreenProps = NativeStackScreenProps<RootStackParamList, 'CameraScreen'>;
-type Screen2Props = NativeStackScreenProps<RootStackParamList, 'Screen2'>;
+type ResultSreenProps = NativeStackScreenProps<RootStackParamList, 'ResutltScreen'>;
 
-const Screen2 = ({ route, navigation }: Screen2Props) => {
+const ResultScreen = ({ route, navigation }: ResultSreenProps) => {
   const insets = useSafeAreaInsets();
+  const { url } = route.params;
 
   return (
     <View
@@ -37,6 +38,7 @@ const Screen2 = ({ route, navigation }: Screen2Props) => {
         },
       ]}>
       <StatusBar barStyle="light-content" animated />
+      {url && <Image source={{ uri: url }} style={{ flex: 1 }} />}
       <Button title="Camera" onPress={() => navigation.navigate('CameraScreen')} />
     </View>
   )
@@ -46,8 +48,9 @@ const CameraScreen = ({ route, navigation }: CameraScreenProps) => {
   const insets = useSafeAreaInsets();
   const [type, setType] = useState(CameraType.back);
   const [permission, requestPermission] = Camera.useCameraPermissions();
-  const [imagePadding, setImagePadding] = useState(0);
-  const { height, width } = Dimensions.get('window');
+  const camera = useRef<Camera>(null);
+  const { width } = Dimensions.get('window');
+  const isFocused = useIsFocused();
 
   function calculateHeight() {
     return width * 16 / 9;
@@ -66,6 +69,20 @@ const CameraScreen = ({ route, navigation }: CameraScreenProps) => {
 
   function toggleCameraType() {
     setType(current => (current === CameraType.back ? CameraType.front : CameraType.back));
+  }
+
+  async function takePicture() {
+    try {
+      if (camera.current) {
+        const img = await camera.current.takePictureAsync();
+        navigation.navigate('ResutltScreen', { url: img.uri })
+      }
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to take picture',
+      })
+    }
   }
 
   useEffect(() => {
@@ -95,23 +112,31 @@ const CameraScreen = ({ route, navigation }: CameraScreenProps) => {
       },
     ]}>
       <StatusBar barStyle="light-content" animated />
-      <Camera style={[
-        styles.camera,
-        {
-          maxHeight: calculateHeight(),
-        }
-      ]} type={type} ratio='16:9' />
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity onPress={() => navigation.navigate('Screen2')}>
-          <MaterialIcons name="insert-photo" size={32} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity>
-          <MaterialIcons name="camera" size={48} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={toggleCameraType}>
-          <MaterialIcons name="flip-camera-ios" size={32} color="white" />
-        </TouchableOpacity>
-      </View>
+      {isFocused && (
+        <>
+          <Camera style={[
+            styles.camera,
+            {
+              maxHeight: calculateHeight(),
+            }
+          ]}
+            type={type}
+            ratio='16:9'
+            ref={camera}
+          />
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity onPress={() => navigation.navigate('ResutltScreen', { url: '' })}>
+              <MaterialIcons name="insert-photo" size={32} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={takePicture}>
+              <MaterialIcons name="camera" size={48} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleCameraType}>
+              <MaterialIcons name="flip-camera-ios" size={32} color="white" />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
     </View>
   )
 }
@@ -122,8 +147,6 @@ const App = () => {
   const [isTfReady, setIsTfReady] = useState(false);
   const [result, setResult] = useState('');
   const image = useRef(null);
-  const [previewVisible, setPreviewVisible] = React.useState(false)
-  const [capturedImage, setCapturedImage] = React.useState<any>(null)
 
   const load = async () => {
     try {
@@ -178,9 +201,9 @@ const App = () => {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <RootStack.Navigator initialRouteName='Screen2' screenOptions={{ headerShown: false, headerBackVisible: false }}>
+        <RootStack.Navigator initialRouteName='CameraScreen' screenOptions={{ headerShown: false, headerBackVisible: false }}>
           <RootStack.Screen name='CameraScreen' component={CameraScreen} />
-          <RootStack.Screen name='Screen2' component={Screen2} />
+          <RootStack.Screen name='ResutltScreen' component={ResultScreen} />
         </RootStack.Navigator>
       </NavigationContainer>
       <Toast />
@@ -193,6 +216,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignContent: 'center',
+    backgroundColor: 'black',
   },
   camera: {
     flex: 1,
